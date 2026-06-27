@@ -112,7 +112,7 @@ async def main():
         # Subscribe using the subscriber class
         await subscriber.subscribe(settings.NATS_SUBJECT, handler)
         
-        neo4j_client = Neo4jClient(settings.NEO4J_URI, settings.NEO4J_USER, settings.NEO4J_PASSWORD , settings.NEO4J_MCP_URL,settings.NEO4J_MCP_USER , settings.NEO4J_PASSWORD)
+        neo4j_client = Neo4jClient(settings.NEO4J_URI, settings.NEO4J_USER, settings.NEO4J_PASSWORD )
         await neo4j_client.connect()
 
         print("RCA agent is running...")  

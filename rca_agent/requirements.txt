@@ -2,3 +2,5 @@ google-adk
 python-dotenv
 nats-py
 neo4j
+slack-bolt
+slack-sdk

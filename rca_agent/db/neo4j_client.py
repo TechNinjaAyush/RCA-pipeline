@@ -5,29 +5,20 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Create HTTP Basic Auth header using the Neo4j MCP credentials
-credentials = base64.b64encode(
-    f"{settings.NEO4J_MCP_USER}:{settings.NEO4J_MCP_PASSWORD}".encode()
-).decode()
-
-
-
 
 class Neo4jClient:
-   def __init__(self, uri, user, password ,mcp_url , mcp_user,mcp_password ):
+   def __init__(self, uri, user, password ):
         self.uri = uri
         self.user = user
         self.password = password
-        self.mcp_url = mcp_url 
-        self.mcp_user  = mcp_user 
-        self.mcp_password  = mcp_password
+      
         self.driver = None
         
 
    async def connect(self):
         try:
             
-            logger.info("started connecteding using ", self.user)
+            logger.info(f"started connecteding using {self.user}")
             self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))   
             
             

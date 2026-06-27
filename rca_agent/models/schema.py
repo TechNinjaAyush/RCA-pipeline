@@ -97,6 +97,8 @@ class TrafficAlert(BaseModel):
     timestamp: int
 
 class AnalyticsOutput(BaseModel):
+    failed_service: str = Field(description="The name of the failed service.")
+    incident_id: str = Field(description="The incident ID.")
     upstream_failed_services: List[str] = Field(description="List of upstream services impacted by this failure.")
     downstream_failed_services: List[str] = Field(description="List of downstream services impacted by this failure.")
     blast_radius: int = Field(description="The count of services dependent on this failed service.")
@@ -129,8 +131,28 @@ class RemediationOutput(BaseModel):
     kubectl_commands: List[str] = Field(description="Safe kubectl commands to apply the fix")
 
 class FinalRCAOutput(BaseModel):
+    failed_service: str = Field(description="The name of the failed service, passed down from the session state or initial alert.")
+    incident_id: str = Field(description="The incident ID, passed down from the session state or initial alert.")
     observed_conditions: List[str] = Field(description="Conditions observed across all agent outputs")
     diagnosis_summary: str = Field(description="Summary of findings")
     suspected_root_cause: str = Field(description="Your root cause analysis")
     investigation_complete: bool = Field(description="Whether investigation is complete")
     remediation_plan: RemediationOutput = Field(description="The proposed remediation plan")
+
+class NotificationOutput(BaseModel):
+    slack_message_sent: bool = Field(description="True if the Slack incident card was successfully posted.")
+    slack_channel: Optional[str] = Field(description="The Slack channel the card was posted to, if available.", default=None)
+    slack_message_ts: Optional[str] = Field(description="The Slack message timestamp (ts) returned by the API.", default=None)
+    incident_id: str = Field(description="The incident ID embedded in the Slack card.")
+    kubectl_command: str = Field(description="The kubectl command embedded in the Approve button.")
+    error: Optional[str] = Field(description="Error message if Slack posting failed.", default=None)
+
+class HumanDecisionOutput(BaseModel):
+    decision: str = Field(description="The human's decision: 'approved', 'rejected', or 'timeout'.")
+    decided_by_id: str = Field(description="Slack user ID of the engineer who made the decision.")
+    decided_by_name: str = Field(description="Display name of the engineer who made the decision.")
+    kubectl_command: str = Field(description="The kubectl command that was approved or rejected.")
+    namespace: str = Field(description="Kubernetes namespace of the affected workload.")
+    deployment: str = Field(description="Kubernetes deployment / service name.")
+    decided_at: str = Field(description="ISO-8601 timestamp of when the decision was made.")
+    incident_id: str = Field(description="The incident ID this decision belongs to.")

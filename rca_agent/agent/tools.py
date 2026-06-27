@@ -47,11 +47,12 @@ def read_neo4j_cypher(query: str) -> str:
 
 
 
-async def check_pod_status_via_nats(pod_name: str) -> str:
+async def check_pod_status_via_nats(pod_name: str, service_name: str = "") -> str:
     """Asks the external Observer via NATS for the status of a specific pod.
     
     Args:
         pod_name: The name of the failed pod.
+        service_name: The name of the failed service (optional) to check label matches.
         
     Returns:
         JSON string of the pod status, or an error/timeout message.
@@ -62,7 +63,7 @@ async def check_pod_status_via_nats(pod_name: str) -> str:
         await nc.connect(settings.NATS_URL)
         
         # Publish request and wait up to 5 seconds for the Observer to reply
-        request_data = json.dumps({"action": "check_pod", "pod_name": pod_name})
+        request_data = json.dumps({"action": "check_pod", "pod_name": pod_name, "service_name": service_name})
         msg = await nc.request("observer.pod.status", request_data.encode(), timeout=5.0)
         
         return msg.data.decode()
@@ -142,3 +143,86 @@ def send_email_via_gmail(report_content: str) -> str:
         return json.dumps({"status": "success", "message": f"Email successfully sent to {recipient}"})
     except Exception as e:
         return json.dumps({"error": f"Failed to send email: {str(e)}"})
+
+
+# ---------------------------------------------------------------------------
+# NOTIFICATION AGENT TOOL — Slack Bolt incident card
+# ---------------------------------------------------------------------------
+
+def send_slack_incident_alert(
+    incident_id: str,
+    severity: str,
+    namespace: str,
+    failed_pod: str,
+    failed_service: str,
+    root_cause: str,
+    diagnosis_summary: str,
+    evidence: str,
+    impacted_services: str,
+    blast_radius: int,
+    kubectl_command: str,
+    timestamp: str,
+) -> str:
+    """Posts a rich RCA incident card to Slack with Approve / Reject buttons.
+
+    The card is posted via the Slack Web API using Block Kit. The Approve and
+    Reject buttons are wired to the Slack Bolt action handlers which then
+    publish the decision to NATS for the Go observer / Remediation Agent.
+
+    Args:
+        incident_id:       Unique identifier for this incident.
+        severity:          Severity level — critical | high | medium | low.
+        namespace:         Kubernetes namespace of the affected workload.
+        failed_pod:        Name of the failing pod.
+        failed_service:    Name of the failing service / deployment.
+        root_cause:        Root cause string from FinalRCAOutput.
+        diagnosis_summary: Diagnosis summary from FinalRCAOutput.
+        evidence:          Key evidence / observations (log lines, metrics).
+        impacted_services: Comma-separated list of impacted service names.
+        blast_radius:      Number of services impacted.
+        kubectl_command:   The recommended kubectl remediation command.
+        timestamp:         ISO-8601 timestamp of the incident.
+
+    Returns:
+        JSON string: {"status": "success", "channel": "...", "ts": "..."} or
+                     {"status": "error", "error": "..."}.
+    """
+    import sys
+    import os
+    # Ensure rca_agent root is on path so slack_bot package can be imported
+    rca_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if rca_root not in sys.path:
+        sys.path.insert(0, rca_root)
+
+    from slack_bot.notifier import post_incident_alert
+
+    webhook_url = getattr(settings, "SLACK_WEBHOOK_URL", "")
+
+    if not webhook_url:
+        return json.dumps({
+            "status": "error",
+            "error": "SLACK_WEBHOOK_URL not configured. Set it in your .env file."
+        })
+
+    services_list = [s.strip() for s in impacted_services.split(",") if s.strip()]
+
+    result = post_incident_alert(
+        webhook_url=webhook_url,
+        incident_id=incident_id,
+        severity=severity,
+        namespace=namespace,
+        failed_pod=failed_pod,
+        failed_service=failed_service,
+        root_cause=root_cause,
+        diagnosis_summary=diagnosis_summary,
+        evidence=evidence,
+        impacted_services=services_list,
+        blast_radius=blast_radius,
+        kubectl_command=kubectl_command,
+        timestamp=timestamp,
+    )
+
+    return json.dumps(result)
+
+
+
