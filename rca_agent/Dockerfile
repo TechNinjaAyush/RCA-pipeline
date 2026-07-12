@@ -13,7 +13,8 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install python packages
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --upgrade pip wheel setuptools jaraco.context && \
+    pip3 install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
 FROM gcr.io/distroless/python3-debian12:nonroot
